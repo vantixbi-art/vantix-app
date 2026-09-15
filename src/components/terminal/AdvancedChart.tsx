@@ -9,9 +9,14 @@ export const AdvancedChart = memo(function AdvancedChart({ symbol }: AdvancedCha
 
   useEffect(() => {
     if (!container.current) return;
-    
-    // Clear the container before injecting to avoid duplicate charts in React Strict Mode
+
     container.current.innerHTML = '';
+
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container__widget';
+    widgetDiv.style.height = '100%';
+    widgetDiv.style.width = '100%';
+    container.current.appendChild(widgetDiv);
 
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
@@ -19,7 +24,7 @@ export const AdvancedChart = memo(function AdvancedChart({ symbol }: AdvancedCha
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol: symbol,
+      symbol: symbol || "NVDA",
       interval: "D",
       timezone: "Etc/UTC",
       theme: "dark",
@@ -30,8 +35,7 @@ export const AdvancedChart = memo(function AdvancedChart({ symbol }: AdvancedCha
       gridColor: "#1E1E22",
       hide_side_toolbar: false,
       hide_top_toolbar: false,
-      allow_symbol_change: false,
-      hide_legend: false,
+      allow_symbol_change: true,
       save_image: false,
       support_host: "https://www.tradingview.com"
     });
@@ -40,8 +44,8 @@ export const AdvancedChart = memo(function AdvancedChart({ symbol }: AdvancedCha
   }, [symbol]);
 
   return (
-    <div id="tour-advanced-chart" className="glass-panel w-full h-full min-h-[400px] overflow-hidden flex flex-col">
-      <div className="flex-1" ref={container}></div>
+    <div id="tour-advanced-chart" className="glass-panel w-full h-full min-h-[420px] overflow-hidden flex flex-col p-1">
+      <div className="tradingview-widget-container flex-1 w-full h-full" ref={container}></div>
     </div>
   );
 });

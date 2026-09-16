@@ -70,6 +70,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear user-specific cached data before ending the session
+    if (user?.id) {
+      try { localStorage.removeItem(`vantix_avatar_${user.id}`); } catch { /* ignore */ }
+    }
     await supabase.auth.signOut();
   };
 

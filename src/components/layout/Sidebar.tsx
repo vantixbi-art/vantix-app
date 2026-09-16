@@ -13,6 +13,7 @@ import {
   Crown,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,22 +24,41 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 const navItems = [
-  { path: '/',         icon: Activity,      label: 'Terminal',       tourId: 'tour-sidebar-terminal' },
-  { path: '/news',     icon: Globe2,        label: 'Global News',    tourId: 'tour-sidebar-news'     },
-  { path: '/tools',    icon: LineChart,     label: 'Investor Tools', tourId: 'tour-sidebar-tools'    },
-  { path: '/journal',  icon: BookOpen,      label: 'Trade Journal',  tourId: 'tour-sidebar-journal'  },
-  { path: '/whales',   icon: Fish,          label: 'Whale Tracker',  tourId: 'tour-sidebar-whales'   },
-  { path: '/alerts',   icon: BellRing,      label: 'Alerts',         tourId: 'tour-sidebar-alerts'   },
-  { path: '/academy',  icon: GraduationCap, label: 'Academy',        tourId: 'tour-sidebar-academy'  },
-  { path: '/billing',  icon: CreditCard,    label: 'Billing & Plans'                                  },
-  { path: '/settings', icon: Settings,      label: 'Settings'                                         },
+  { path: '/', icon: Activity, label: 'Terminal', tourId: 'tour-sidebar-terminal' },
+  { path: '/news', icon: Globe2, label: 'Global News', tourId: 'tour-sidebar-news' },
+  { path: '/tools', icon: LineChart, label: 'Investor Tools', tourId: 'tour-sidebar-tools' },
+  { path: '/journal', icon: BookOpen, label: 'Trade Journal', tourId: 'tour-sidebar-journal' },
+  { path: '/whales', icon: Fish, label: 'Whale Tracker', tourId: 'tour-sidebar-whales' },
+  { path: '/alerts', icon: BellRing, label: 'Alerts', tourId: 'tour-sidebar-alerts' },
+  { path: '/academy', icon: GraduationCap, label: 'Academy', tourId: 'tour-sidebar-academy' },
+  { path: '/billing', icon: CreditCard, label: 'Billing & Plans' },
+  { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const STORAGE_KEY = 'vantix-sidebar';
 
 export function Sidebar() {
   const location = useLocation();
-  const { tier } = useUser();
+  const { tier, user, signOut } = useUser();
+
+  const email       = user?.email || 'Guest Trader';
+  const displayName = user?.user_metadata?.full_name
+    || user?.user_metadata?.name
+    || (user?.email ? user.email.split('@')[0] : 'Trader');
+  const initial = displayName.charAt(0).toUpperCase();
+
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+    if (!user?.id) return '';
+    return user?.user_metadata?.avatar_url || localStorage.getItem(`vantix_avatar_${user.id}`) || '';
+  });
+
+  useEffect(() => {
+    function onUpdate(e: Event) {
+      setAvatarUrl((e as CustomEvent<string>).detail ?? '');
+    }
+    window.addEventListener('vantix-avatar-updated', onUpdate);
+    return () => window.removeEventListener('vantix-avatar-updated', onUpdate);
+  }, []);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEY) === 'collapsed'; }
     catch { return false; }
@@ -128,12 +148,20 @@ export function Sidebar() {
       {/* User profile card — expanded only */}
       {!collapsed && (
         <div className="mt-2 mb-2 p-3 glass-panel flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gold/40 to-gold/10 border border-gold/30 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-gold">G</span>
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Avatar"
+              className="w-7 h-7 rounded-full object-cover border border-gold/30 shrink-0"
+            />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gold/40 to-gold/10 border border-gold/30 flex items-center justify-center shrink-0">
+              <span className="text-xs font-bold text-gold">{initial}</span>
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">Gilad</p>
-            <p className="text-[10px] text-muted truncate">gilad3210@gmail.com</p>
+            <p className="text-xs font-semibold text-white truncate">{displayName}</p>
+            <p className="text-[10px] text-muted truncate">{email}</p>
           </div>
           {isPro ? (
             <div
@@ -148,6 +176,15 @@ export function Sidebar() {
               FREE
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => signOut()}
+            aria-label="Sign out"
+            title="Sign out"
+            className="text-muted/40 hover:text-alert transition-colors shrink-0 ml-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-alert/50 rounded"
+          >
+            <LogOut size={13} />
+          </button>
         </div>
       )}
 
@@ -162,9 +199,9 @@ export function Sidebar() {
       {/* Legal links — expanded only */}
       {!collapsed && (
         <div className="mt-1 px-1 flex items-center justify-center gap-2 flex-wrap">
-          <Link to="/privacy"       className="text-[9px] text-muted/40 hover:text-muted/70 transition-colors underline-offset-2 hover:underline">Privacy</Link>
+          <Link to="/privacy" className="text-[9px] text-muted/40 hover:text-muted/70 transition-colors underline-offset-2 hover:underline">Privacy</Link>
           <span className="text-muted/20 text-[9px]">·</span>
-          <Link to="/terms"         className="text-[9px] text-muted/40 hover:text-muted/70 transition-colors underline-offset-2 hover:underline">Terms</Link>
+          <Link to="/terms" className="text-[9px] text-muted/40 hover:text-muted/70 transition-colors underline-offset-2 hover:underline">Terms</Link>
           <span className="text-muted/20 text-[9px]">·</span>
           <Link to="/accessibility" className="text-[9px] text-muted/40 hover:text-muted/70 transition-colors underline-offset-2 hover:underline">Accessibility</Link>
         </div>

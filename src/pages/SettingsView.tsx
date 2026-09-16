@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { User, SlidersHorizontal, CheckCircle2, Crown, Shield, Zap, Palette, Check, Copy, MessageCircle, HeartHandshake, BrainCircuit, CreditCard, Mail } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { User, SlidersHorizontal, CheckCircle2, Crown, Shield, Zap, Palette, Check, Copy, MessageCircle, HeartHandshake, BrainCircuit, CreditCard, Mail, Camera, Trash2, LogOut, RefreshCw } from 'lucide-react';
 import { useTheme, THEMES, type ThemeId } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { encryptKey, decryptKey } from '../lib/crypto';
+import { supabase } from '../lib/supabase';
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -29,6 +30,141 @@ function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: stri
 
 const inputCls =
   'w-full bg-input border border-border rounded-md px-3 py-2.5 text-sm text-white placeholder:text-muted/40 font-mono focus:outline-none focus:border-gold transition-colors';
+
+// ── Image compression helper ──────────────────────────────────────────────────
+
+function compressImage(file: File, maxPx = 128, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+      const scale  = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = blobUrl;
+  });
+}
+
+// ── Profile Avatar ────────────────────────────────────────────────────────────
+
+function ProfileAvatarCard() {
+  const { user } = useUser();
+  const userId   = user?.id ?? '';
+  const storageKey = `vantix_avatar_${userId}`;
+
+  const [preview,   setPreview]   = useState<string>(() =>
+    user?.user_metadata?.avatar_url || (userId ? localStorage.getItem(storageKey) ?? '' : '')
+  );
+  const [uploading, setUploading] = useState(false);
+  const [removing,  setRemoving]  = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+    setUploading(true);
+    try {
+      const dataUrl = await compressImage(file, 128, 0.85);
+      try { localStorage.setItem(storageKey, dataUrl); } catch { /* quota exceeded */ }
+      await supabase.auth.updateUser({ data: { avatar_url: dataUrl } });
+      setPreview(dataUrl);
+      window.dispatchEvent(new CustomEvent<string>('vantix-avatar-updated', { detail: dataUrl }));
+    } catch { /* ignore */ }
+    finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function removeAvatar() {
+    if (!userId) return;
+    setRemoving(true);
+    try {
+      localStorage.removeItem(storageKey);
+      await supabase.auth.updateUser({ data: { avatar_url: null } });
+      setPreview('');
+      window.dispatchEvent(new CustomEvent<string>('vantix-avatar-updated', { detail: '' }));
+    } catch { /* ignore */ }
+    finally { setRemoving(false); }
+  }
+
+  const initial = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'T')
+    .charAt(0).toUpperCase();
+
+  return (
+    <div className="glass-panel p-5">
+      <SectionHeader
+        icon={<Camera size={15} />}
+        title="Profile Avatar"
+        subtitle="Upload a custom profile photo — displayed in the sidebar"
+      />
+
+      <div className="flex items-center gap-5">
+        {/* Preview */}
+        <div className="relative shrink-0">
+          {preview ? (
+            <img
+              src={preview}
+              alt="Avatar preview"
+              className="w-16 h-16 rounded-full object-cover border-2 border-gold/40"
+              style={{ boxShadow: '0 0 16px rgba(255,215,0,0.14)' }}
+            />
+          ) : (
+            <div
+              className="w-16 h-16 rounded-full bg-gradient-to-br from-gold/40 to-gold/10 border-2 border-gold/30 flex items-center justify-center"
+              style={{ boxShadow: '0 0 16px rgba(255,215,0,0.10)' }}
+            >
+              <span className="text-2xl font-bold text-gold">{initial}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={handleFile}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-gold/30 bg-gold/[0.06] text-sm font-bold text-gold transition-all hover:bg-gold/10 hover:border-gold/50 disabled:opacity-50 disabled:cursor-wait"
+            style={{ boxShadow: '0 0 14px rgba(255,215,0,0.06)' }}
+          >
+            <Camera size={14} />
+            {uploading ? 'Uploading…' : 'Upload Photo'}
+          </button>
+
+          {preview && (
+            <button
+              type="button"
+              onClick={removeAvatar}
+              disabled={removing}
+              className="flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-alert/20 bg-alert/[0.04] text-xs font-semibold text-alert/80 transition-all hover:bg-alert/10 hover:border-alert/40 hover:text-alert disabled:opacity-50"
+            >
+              <Trash2 size={12} />
+              {removing ? 'Removing…' : 'Remove Avatar'}
+            </button>
+          )}
+
+          <p className="text-[10px] text-muted/40 leading-relaxed">
+            PNG, JPG or WEBP · Resized to 128 × 128 px
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Profile & Subscription ────────────────────────────────────────────────────
 
@@ -446,6 +582,61 @@ function SupportCard() {
   );
 }
 
+// ── Account & Session Management ─────────────────────────────────────────────
+
+function AccountCard() {
+  const { signOut } = useUser();
+  const [busy, setBusy] = useState(false);
+
+  async function handleSignOut() {
+    setBusy(true);
+    try { await signOut(); } catch { setBusy(false); }
+  }
+
+  return (
+    <div className="glass-panel p-5">
+      <SectionHeader
+        icon={<LogOut size={15} />}
+        title="Account & Session Management"
+        subtitle="Sign out or switch to a different account"
+      />
+
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Sign Out */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={busy}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-alert/30 bg-alert/[0.05] text-sm font-bold text-alert transition-all hover:bg-alert/10 hover:border-alert/50 disabled:opacity-50 disabled:cursor-wait"
+          >
+            <LogOut size={14} />
+            {busy ? 'Signing Out…' : 'Sign Out'}
+          </button>
+
+          {/* Switch Account — signs out and lands on login form */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={busy}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border bg-white/[0.03] text-sm font-semibold text-muted transition-all hover:border-white/20 hover:text-white disabled:opacity-50 disabled:cursor-wait"
+          >
+            <RefreshCw size={14} />
+            Switch Account
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white/5 border border-border">
+          <Shield size={12} className="text-muted/50 shrink-0" />
+          <p className="text-[11px] text-muted/60 leading-snug">
+            Signing out ends your session and clears all cached credentials from this browser.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function SettingsView() {
@@ -507,11 +698,13 @@ export function SettingsView() {
         </div>
 
         <ProfileCard />
+        <ProfileAvatarCard />
         <AppearanceCard />
         <AICoachCard />
         <PreferencesCard onChange={markDirty} />
         <BusinessContactCard />
         <SupportCard />
+        <AccountCard />
 
         <p className="text-center text-[11px] text-muted/40 pb-2">
           © 2026 Vantix Terminal · All rights reserved · Official Contact: vantixbi@gmail.com

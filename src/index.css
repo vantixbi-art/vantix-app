@@ -350,6 +350,17 @@
   50%       { transform: translate(4%, -5%) scale(1.06); }
 }
 
+@keyframes welcome-slide-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+@keyframes welcome-slide-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+.welcome-slide-right { animation: welcome-slide-right 0.30s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.welcome-slide-left  { animation: welcome-slide-left  0.30s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
 @keyframes empty-state-glow {
   0%, 100% { border-color: rgb(var(--color-gold) / 0.14); box-shadow: none; }
   50%       { border-color: rgb(var(--color-gold) / 0.32); box-shadow: 0 0 14px rgb(var(--glow-accent) / 0.07); }

@@ -3,6 +3,7 @@ import { Outlet, useLocation, Link } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { FeedbackWidget } from '../feedback/FeedbackWidget';
 import { CookieBanner } from '../common/CookieBanner';
+import { WelcomeModal } from '../common/WelcomeModal';
 import { ZenModeProvider, useZenMode } from '../../contexts/ZenModeContext';
 
 function LayoutInner() {
@@ -95,6 +96,7 @@ function LayoutInner() {
 
       <FeedbackWidget />
       <CookieBanner />
+      <WelcomeModal />
     </div>
   );
 }
